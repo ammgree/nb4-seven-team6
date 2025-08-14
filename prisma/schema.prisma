@@ -13,3 +13,82 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+
+model Group {
+  id                Int             @id @default(autoincrement())
+  ownerParticipantId Int?
+  name              String
+  description       String
+  photoUrl          String?
+  goalRep           Int
+  discordWebhookUrl String?
+  discordInviteUrl  String?
+  likeCount         Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  participants      Participant[]
+  records           Record[]
+  badges            BadgeToGroup[]
+
+  @@index([name])
+}
+
+model Participant {
+  id         Int       @id @default(autoincrement())
+  groupId    Int
+  nickname   String
+  password   String     // bcrypt 해시 저장
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  group      Group     @relation(fields: [groupId], references: [id])
+  records    Record[]
+
+  // 같은 그룹 내 닉네임 중복 방지
+  @@unique([groupId, nickname], name: "groupId_nickname")
+}
+
+model Record {
+  id            Int        @id @default(autoincrement())
+  groupId       Int
+  participantId Int
+  type          RecordType
+  description   String?
+  timeSec       Int
+  distanceM     Int?
+  photos        String[]   // 최대 3장은 서비스단에서 체크
+  createdAt     DateTime   @default(now())
+
+  group         Group      @relation(fields: [groupId], references: [id])
+  participant   Participant @relation(fields: [participantId], references: [id])
+
+  @@index([groupId])
+  @@index([participantId])
+}
+
+enum RecordType {
+  RUN
+  BIKE
+  SWIM
+}
+
+model Badge {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique     // 'TEN_PARTICIPANTS' | 'HUNDRED_RECORDS' | 'HUNDRED_LIKES'
+  label String
+
+  groups BadgeToGroup[]
+}
+
+model BadgeToGroup {
+  groupId   Int
+  badgeId   Int
+  awardedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id])
+  badge Badge @relation(fields: [badgeId], references: [id])
+
+  @@id([groupId, badgeId]) // 한 그룹에 같은 배지는 1번만
+}
